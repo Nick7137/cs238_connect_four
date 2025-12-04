@@ -1,16 +1,223 @@
-function restart_script()
-    clc
-    clear
-    clf
-    close all
-end
-
-%% ------------------------------------------------------------------------ 
+% ------------------------------------------------------------------------- 
 % MCTS VS HUMAN
 % -------------------------------------------------------------------------
 
 restart_script();
+mcts_vs_human([], 50000, 'iteration')
 
+% time based mode example for MCTS move calculation.
+%mcts_vs_human(1, [], 'time')
+
+%% ------------------------------------------------------------------------
+% MCTS VS RANDOM
+% -------------------------------------------------------------------------
+
+restart_script();
+
+n = 1000;
+iters = [5 15 25 100 1000];
+for i = 1:length(iters)
+    results(i,:) = mcts_vs_random(n, [], iters(i), 'iteration');
+    results_sum(i,:) = cumsum(results(i,:));
+    sums(i) = sum(results(i,:) == 1);
+end
+
+figure;
+plot(1:n, results_sum,'-','LineWidth',2)
+xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
+ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
+grid on
+labels = arrayfun(@(k) sprintf('$iterations: %d$', k), iters, ...
+                  'UniformOutput', false);
+legend(labels{:},'Fontsize',16,'interpreter','latex','location','best');
+
+%% ------------------------------------------------------------------------
+% MCTS VS MCTS
+% -------------------------------------------------------------------------
+
+restart_script();
+
+n = 100;
+for i = 1:50
+    results(i,:) = mcts_vs_mcts(n,21,19);
+    results_sum(i,:) = cumsum(results(i,:));
+    sums(i) = nnz(results(i,:) == 1);
+    
+    figure(1)
+    hold on
+    plot(1:n,results_sum(i,:),'-','LineWidth',1)
+end
+xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
+ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
+grid on
+means = mean(results_sum,1);
+plot(1:n,means,'-k','LineWidth',2)
+
+%% TODO reorganise
+
+%{
+TODO
+%}
+function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
+% mcts_vs_random  Play MCTS vs a purely random opponent.
+%
+% results(g) = +1  -> MCTS wins game g
+% results(g) = -1  -> Random wins game g
+% results(g) =  0  -> Draw
+%
+% Inputs:
+%   numGames   : number of games to play
+%   thinkTime  : time in seconds per MCTS move (used if mode = 'time')
+%   iterations : number of MCTS iterations per move (used if mode = 'iteration')
+%   mode       : 'time' or 'iteration'
+
+    if nargin < 4
+        error('Usage: mcts_vs_random(numGames, thinkTime, iterations, ''time'' or ''iteration'')');
+    end
+
+    mode = lower(string(mode));
+    if mode ~= "time" && mode ~= "iteration"
+        error('mode must be ''time'' or ''iteration''.');
+    end
+
+    % Convention: MCTS is -1, Random is +1
+    MCTS   = -1;
+    RANDOM =  1;
+
+    results = zeros(numGames, 1);
+
+    for g = 1:numGames
+        fprintf('Current game: %d / %d\n', g, numGames);
+
+        board = new_board();
+        % Choose who starts; here RANDOM starts
+        turn = RANDOM;
+
+        while true
+            w = winner(board);
+            if w ~= 0 || is_full(board)
+                break;
+            end
+
+            if turn == MCTS
+                % MCTS move, using either time or iterations
+                if mode == "time"
+                    move = mcts_best_move(board, MCTS, [], thinkTime, 1.1, []);
+                else % "iteration"
+                    move = mcts_best_move(board, MCTS, iterations, [], 1.1, []);
+                end
+            else
+                % Random move
+                moves = legal_moves(board);
+                if isempty(moves)
+                    break;
+                end
+                move = moves(randi(numel(moves)));
+            end
+
+            if isempty(move)
+                break;
+            end
+
+            board = make_move(board, move, turn);
+            turn  = -turn;  % switch player
+        end
+
+        w = winner(board);
+        if w == MCTS
+            results(g) = 1;
+        elseif w == RANDOM
+            results(g) = -1;
+        else
+            results(g) = 0;
+        end
+    end
+end
+
+%{
+TODO
+%}
+function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
+% mcts_vs_mcts  Play MCTS vs MCTS in Connect-4.
+%
+% results(g) = +1  -> Player 1 (MCTS1) wins game g
+% results(g) = -1  -> Player 2 (MCTS2) wins game g
+% results(g) =  0  -> Draw
+%
+% Inputs:
+%   numGames    : number of games to play
+%   iterationsP1: number of MCTS iterations per move for Player 1
+%   iterationsP2: number of MCTS iterations per move for Player 2
+%
+% Notes:
+%   - Player 1 is encoded as -1
+%   - Player 2 is encoded as +1
+%   - We alternate who starts: odd games -> Player 1 starts,
+%                               even games -> Player 2 starts.
+
+    if nargin < 2
+        error('Usage: mcts_vs_mcts(numGames, iterationsP1, [iterationsP2])');
+    end
+    if nargin < 3
+        % If not given, use same iterations for both players
+        iterationsP2 = iterationsP1;
+    end
+
+    % Convention: P1 = -1, P2 = +1 (same style as your other code)
+    P1 = -1;
+    P2 =  1;
+
+    results = zeros(numGames, 1);
+
+    for g = 1:numGames
+        fprintf('Current game: %d / %d\n', g, numGames);
+
+        board = new_board();
+
+        % Alternate starting player for fairness
+        if mod(g, 2) == 1
+            turn = P1;
+        else
+            turn = P2;
+        end
+
+        while true
+            w = winner(board);
+            if w ~= 0 || is_full(board)
+                break;
+            end
+
+            % MCTS move for the current player, with its own iteration budget
+            if turn == P1
+                move = mcts_best_move(board, P1, iterationsP1, [], 1.1, []);
+            else
+                move = mcts_best_move(board, P2, iterationsP2, [], 1.1, []);
+            end
+
+            if isempty(move)
+                % If MCTS fails to return a move, abort this game as draw
+                break;
+            end
+
+            board = make_move(board, move, turn);
+            turn  = -turn;  % switch player
+        end
+
+        % Determine outcome
+        w = winner(board);
+        if w == P1
+            results(g) = 1;
+        elseif w == P2
+            results(g) = -1;
+        else
+            results(g) = 0;
+        end
+    end
+end
+
+%{
+TODO
+%}
 function mcts_vs_human(thinkTime, iterations, mode)
 % mcts_vs_human  Human vs MCTS AI Connect-4.
 %
@@ -98,228 +305,6 @@ function mcts_vs_human(thinkTime, iterations, mode)
         fprintf('Draw.\n');
     end
 end
-
-mcts_vs_human([], 50000, 'iteration')
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%mcts_vs_human(1, [], 'time')
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% ------------------------------------------------------------------------
-% MCTS VS RANDOM
-% -------------------------------------------------------------------------
-
-restart_script();
-
-function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
-% mcts_vs_random  Play MCTS vs a purely random opponent.
-%
-% results(g) = +1  -> MCTS wins game g
-% results(g) = -1  -> Random wins game g
-% results(g) =  0  -> Draw
-%
-% Inputs:
-%   numGames   : number of games to play
-%   thinkTime  : time in seconds per MCTS move (used if mode = 'time')
-%   iterations : number of MCTS iterations per move (used if mode = 'iteration')
-%   mode       : 'time' or 'iteration'
-
-    if nargin < 4
-        error('Usage: mcts_vs_random(numGames, thinkTime, iterations, ''time'' or ''iteration'')');
-    end
-
-    mode = lower(string(mode));
-    if mode ~= "time" && mode ~= "iteration"
-        error('mode must be ''time'' or ''iteration''.');
-    end
-
-    % Convention: MCTS is -1, Random is +1
-    MCTS   = -1;
-    RANDOM =  1;
-
-    results = zeros(numGames, 1);
-
-    for g = 1:numGames
-        fprintf('Current game: %d / %d\n', g, numGames);
-
-        board = new_board();
-        % Choose who starts; here RANDOM starts
-        turn = RANDOM;
-
-        while true
-            w = winner(board);
-            if w ~= 0 || is_full(board)
-                break;
-            end
-
-            if turn == MCTS
-                % MCTS move, using either time or iterations
-                if mode == "time"
-                    move = mcts_best_move(board, MCTS, [], thinkTime, 1.1, []);
-                else % "iteration"
-                    move = mcts_best_move(board, MCTS, iterations, [], 1.1, []);
-                end
-            else
-                % Random move
-                moves = legal_moves(board);
-                if isempty(moves)
-                    break;
-                end
-                move = moves(randi(numel(moves)));
-            end
-
-            if isempty(move)
-                break;
-            end
-
-            board = make_move(board, move, turn);
-            turn  = -turn;  % switch player
-        end
-
-        w = winner(board);
-        if w == MCTS
-            results(g) = 1;
-        elseif w == RANDOM
-            results(g) = -1;
-        else
-            results(g) = 0;
-        end
-    end
-end
-
-n = 1000;
-iters = [5 15 25 100 1000];
-for i = 1:length(iters)
-    results(i,:) = mcts_vs_random(n, [], iters(i), 'iteration');
-    results_sum(i,:) = cumsum(results(i,:));
-    sums(i) = sum(results(i,:) == 1);
-end
-
-figure;
-plot(1:n, results_sum,'-','LineWidth',2)
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
-grid on
-labels = arrayfun(@(k) sprintf('$iterations: %d$', k), iters, ...
-                  'UniformOutput', false);
-legend(labels{:},'Fontsize',16,'interpreter','latex','location','best');
-
-%%
-% -------------------------------------------------------------------------
-% MCTS PLAY VS MCTS
-% -------------------------------------------------------------------------
-
-restart_script();
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%{
-n = 100;
-
-results = mcts_vs_mcts(n, 10,10);
-results_sum = cumsum(results);
-sums = sum(results == 1);
-
-figure(1)
-plot(1:n,results_sum,'-k','LineWidth',2)
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
-grid on
-%}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
-% mcts_vs_mcts  Play MCTS vs MCTS in Connect-4.
-%
-% results(g) = +1  -> Player 1 (MCTS1) wins game g
-% results(g) = -1  -> Player 2 (MCTS2) wins game g
-% results(g) =  0  -> Draw
-%
-% Inputs:
-%   numGames    : number of games to play
-%   iterationsP1: number of MCTS iterations per move for Player 1
-%   iterationsP2: number of MCTS iterations per move for Player 2
-%
-% Notes:
-%   - Player 1 is encoded as -1
-%   - Player 2 is encoded as +1
-%   - We alternate who starts: odd games -> Player 1 starts,
-%                               even games -> Player 2 starts.
-
-    if nargin < 2
-        error('Usage: mcts_vs_mcts(numGames, iterationsP1, [iterationsP2])');
-    end
-    if nargin < 3
-        % If not given, use same iterations for both players
-        iterationsP2 = iterationsP1;
-    end
-
-    % Convention: P1 = -1, P2 = +1 (same style as your other code)
-    P1 = -1;
-    P2 =  1;
-
-    results = zeros(numGames, 1);
-
-    for g = 1:numGames
-        fprintf('Current game: %d / %d\n', g, numGames);
-
-        board = new_board();
-
-        % Alternate starting player for fairness
-        if mod(g, 2) == 1
-            turn = P1;
-        else
-            turn = P2;
-        end
-
-        while true
-            w = winner(board);
-            if w ~= 0 || is_full(board)
-                break;
-            end
-
-            % MCTS move for the current player, with its own iteration budget
-            if turn == P1
-                move = mcts_best_move(board, P1, iterationsP1, [], 1.1, []);
-            else
-                move = mcts_best_move(board, P2, iterationsP2, [], 1.1, []);
-            end
-
-            if isempty(move)
-                % If MCTS fails to return a move, abort this game as draw
-                break;
-            end
-
-            board = make_move(board, move, turn);
-            turn  = -turn;  % switch player
-        end
-
-        % Determine outcome
-        w = winner(board);
-        if w == P1
-            results(g) = 1;
-        elseif w == P2
-            results(g) = -1;
-        else
-            results(g) = 0;
-        end
-    end
-end
-
-n = 100;
-for i = 1:50
-    results(i,:) = mcts_vs_mcts(n,21,19);
-    results_sum(i,:) = cumsum(results(i,:));
-    sums(i) = nnz(results(i,:) == 1);
-    
-    figure(1)
-    hold on
-    plot(1:n,results_sum(i,:),'-','LineWidth',1)
-end
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
-grid on
-means = mean(results_sum,1);
-plot(1:n,means,'-k','LineWidth',2)
 
 %% ------------------------------------------------------------------------ 
 % GAME MECHANICS
@@ -431,11 +416,13 @@ function tf = is_full(board)
     tf = all(board(1,:) ~= 0);
 end
 
-
 %% ------------------------------------------------------------------------
 % TOP-LEVEL MCTS DRIVER
 %--------------------------------------------------------------------------
 
+%{
+TODO
+%}
 function move = mcts_best_move(board, player, iterations, time_limit, Cp, seed)
     % Return best column (1..7) for `player` using MCTS (iterations or time budget).
 
@@ -563,6 +550,9 @@ end
 % ROLLOUT POLICY AND SIMULATION
 % -------------------------------------------------------------------------
 
+%{
+TODO
+%}
 function move = policy_rollout_move(board, player)
     % Lightly biased rollout:
     %  1) take immediate win if available
@@ -616,6 +606,9 @@ function move = policy_rollout_move(board, player)
     move = moves(randi(numel(moves)));
 end
 
+%{
+TODO
+%}
 function result = rollout(board, player, root_player)
     % Random (biased) playout until terminal
     b = board;
@@ -643,6 +636,9 @@ function result = rollout(board, player, root_player)
     end
 end
 
+%{
+TODO
+%}
 function r = get_result(winner_flag, root_player)
     if winner_flag == 0
         r = 0.0;
@@ -657,6 +653,9 @@ end
 % TREE EXPANSION & BACKPROP
 % -------------------------------------------------------------------------
 
+%{
+TODO
+%}
 function [nodes, child_idx] = expand_node(nodes, node_idx)
     node = nodes(node_idx);
     m = node.untried(end);
@@ -671,6 +670,9 @@ function [nodes, child_idx] = expand_node(nodes, node_idx)
     nodes(node_idx)  = node;
 end
 
+%{
+TODO
+%}
 function nodes = backpropagate(nodes, node_idx, reward)
     % Reward is from root player's perspective (no sign flip)
     n = node_idx;
@@ -679,4 +681,15 @@ function nodes = backpropagate(nodes, node_idx, reward)
         nodes(n).W = nodes(n).W + reward;
         n = nodes(n).parent;
     end
+end
+
+%% ------------------------------------------------------------------------
+% OTHER
+%--------------------------------------------------------------------------
+
+function restart_script()
+    clc
+    clear
+    clf
+    close all
 end
