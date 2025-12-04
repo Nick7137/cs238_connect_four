@@ -1,7 +1,3 @@
-%%
-%testing commits
-%%
-
 % ------------------------------------------------------------------------- 
 % MCTS VS HUMAN
 % -------------------------------------------------------------------------
@@ -326,16 +322,25 @@ end
 
 %%
 % ------------------------------------------------------------------------- 
-% GAME SETUP
+% GAME MECHANICS
 % -------------------------------------------------------------------------
 
-function board = new_board()
+%{
+Initialise 6x7 grid as array of zeros. 0 is empty, -1 is MCTS, +1 is 
+human/random.
+%}
+function board = new_board()  
     ROWS = 6;
     COLS = 7;
     board = zeros(ROWS, COLS);   % 0 empty, +1 human, -1 AI
 end
 
+%{
+Provides a visual output of the board to the terminal using O for MCTS
+and X for the human/random.
+%}
 function print_board(board)
+    
     [ROWS, COLS] = size(board);
 
     % Column headers
@@ -365,13 +370,17 @@ function print_board(board)
     fprintf('\n');
 end
 
+%{
+Returns the columns (1..7) which are not full
+%}
 function moves = legal_moves(board)
-    % Returns columns (1..7) that are not full
     moves = find(board(1,:) == 0);
 end
 
+%{
+Drop piece in selected column "col" (1..7) for given "player"
+%}
 function nb = make_move(board, col, player)
-    % Drop a piece in column "col" (1..7) for "player"
     [ROWS, ~] = size(board);
     r = ROWS;
     while r >= 1 && board(r,col) ~= 0
@@ -381,8 +390,10 @@ function nb = make_move(board, col, player)
     nb(r,col) = player;
 end
 
+%{
+Returns 1 or -1 if someone won; 0 otherwise
+%}
 function w = winner(board)
-    % Returns 1 or -1 if someone won; 0 otherwise
     [ROWS, COLS] = size(board);
     dirs = [1 0; 0 1; 1 1; 1 -1];
 
@@ -413,6 +424,9 @@ function w = winner(board)
     w = 0;
 end
 
+%{
+Checks if entire board is full => draw
+%}
 function tf = is_full(board)
     tf = all(board(1,:) ~= 0);
 end
@@ -421,17 +435,31 @@ end
 % MCTS NODE REPRESENTATION
 % -------------------------------------------------------------------------
 
+%{
+Creates a struct for a single node in the MCTS tree. Stores the current 
+"board", the whose turn it is, the list of "untried" legal moves (for 
+expansion), and the MCTS counters: N (visits) and W (total reward) from the
+perspective of the MCTS.
+%}
 function node = create_node(board, player, parent_idx, move)
     node.board    = board;
-    node.player   = player;      % player to move at this node
+    node.player   = player;      % player whose turn it is at this node
     node.parent   = parent_idx;  % parent index in the nodes array (0 for root)
     node.move     = move;        % move (column) that led here from parent
     node.children = [];          % indices of children in nodes array
     node.untried  = legal_moves(board);  % columns yet to expand
-    node.N        = 0;           % visits
-    node.W        = 0.0;         % total reward from root player's perspective
+    node.N        = 0;           % num visits
+    node.W        = 0.0;         % cumulative sum of rewards from all simulations (rollouts) that passed through this specific node
 end
 
+% -------------------------------------------------------------------------
+% MCTS SELECTION PHASE
+% -------------------------------------------------------------------------
+
+%{
+This function implements the selection phase of the MCTS using the UCB1
+heuristic.
+%}
 function child_idx = uct_select_child_idx(nodes, node_idx, Cp)
     % Upper Confidence bound: Q + Cp * sqrt(ln(Np) / Nc)
     parentN = nodes(node_idx).N;
