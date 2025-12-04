@@ -429,13 +429,13 @@ end
 %--------------------------------------------------------------------------
 
 %{
-TODO
+This function executes the complete search process and returns the best
+move (column 1..7) for the given "player" on the current "board". Runs
+until number of iterations is reached or time budget is exhausted.
 %}
-function move = mcts_best_move(board, player, iterations, time_limit, Cp, seed)
-    % Return best column (1..7) for `player` using MCTS (iterations or time budget).
-
-    if nargin < 3 || isempty(iterations)
-        iterations = 6000;
+function move = mcts_best_move(board, player, num_iterations, time_limit, Cp, seed)
+    if nargin < 3 || isempty(num_iterations)
+        num_iterations = 6000;
     end
     if nargin < 4
         time_limit = [];
@@ -450,40 +450,50 @@ function move = mcts_best_move(board, player, iterations, time_limit, Cp, seed)
         rng(seed);
     end
 
-    % Initialize root node
+    % Initialize root node - the current board or the start of the MCTS,
+    % i.e. the current state of the game for which we are trying to find
+    % the best move.
     nodes(1) = create_node(board, player, 0, []); %#ok<AGROW>
     root_idx = 1;
 
+    %start the clock and iteration number
     start = tic;
-    it = 0;
+    iteration = 0;
 
+    % Enter the MCTS loop
     while true
+
+        % Stop the search if the time or num iterations has run out
         if ~isempty(time_limit)
             if toc(start) >= time_limit
                 break;
             end
         else
-            if it >= iterations
+            if iteration >= num_iterations
                 break;
             end
         end
-        it = it + 1;
+        iteration = iteration + 1;
 
-        % 1) Selection
+        % 1) Selection - choose the most promising path using the UCB1
+        % exploration heuristic.
         node_idx = root_idx;
         while isempty(nodes(node_idx).untried) && ~isempty(nodes(node_idx).children)
             node_idx = uct_select_child_idx(nodes, node_idx, Cp);
         end
 
-        % 2) Expansion
+        % 2) Expansion - if the selected node has untried moves, it expands
+        % one untried move to create a new child node
         if ~isempty(nodes(node_idx).untried)
             [nodes, node_idx] = expand_node(nodes, node_idx);
         end
 
-        % 3) Simulation (rollout)
+        % 3) Simulation (rollout) - play out random actions until a
+        % terminal state.
         result = rollout(nodes(node_idx).board, nodes(node_idx).player, player);
 
-        % 4) Backpropagation
+        % 4) Backpropagation - update the win/visit statistics of all nodes
+        % along the path from the new node back up to the root.
         nodes = backpropagate(nodes, node_idx, result);
     end
 
