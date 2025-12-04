@@ -57,6 +57,9 @@ plot(1:n,means,'-k','LineWidth',2)
 % MCTS IMPLEMENTATION
 % -------------------------------------------------------------------------
 
+%{
+TODO
+%}
 function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
 % mcts_vs_random  Play MCTS vs a purely random opponent.
 %
@@ -133,6 +136,9 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
     end
 end
 
+%{
+TODO
+%}
 function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
 % mcts_vs_mcts  Play MCTS vs MCTS in Connect-4.
 %
@@ -211,6 +217,9 @@ function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
     end
 end
 
+%{
+TODO
+%}
 function play_human_vs_ai(thinkTime, iterations, mode)
 % play_human_vs_ai  Human vs MCTS AI Connect-4.
 %
@@ -408,21 +417,35 @@ function tf = is_full(board)
     tf = all(board(1,:) ~= 0);
 end
 
-%---------------------------------------------------------------
-% Node representation for MCTS
-%---------------------------------------------------------------
+% ------------------------------------------------------------------------
+% MCTS NODE REPRESENTATION
+% -------------------------------------------------------------------------
 
+%{
+Creates a struct for a single node in the MCTS tree. Stores the current 
+"board", the whose turn it is, the list of "untried" legal moves (for 
+expansion), and the MCTS counters: N (visits) and W (total reward) from the
+perspective of the MCTS.
+%}
 function node = create_node(board, player, parent_idx, move)
     node.board    = board;
-    node.player   = player;      % player to move at this node
+    node.player   = player;      % player whose turn it is at this node
     node.parent   = parent_idx;  % parent index in the nodes array (0 for root)
     node.move     = move;        % move (column) that led here from parent
     node.children = [];          % indices of children in nodes array
     node.untried  = legal_moves(board);  % columns yet to expand
-    node.N        = 0;           % visits
-    node.W        = 0.0;         % total reward from root player's perspective
+    node.N        = 0;           % num visits
+    node.W        = 0.0;         % cumulative sum of rewards from all simulations (rollouts) that passed through this specific node
 end
 
+% -------------------------------------------------------------------------
+% MCTS SELECTION PHASE
+% -------------------------------------------------------------------------
+
+%{
+This function implements the selection phase of the MCTS using the UCB1
+heuristic.
+%}
 function child_idx = uct_select_child_idx(nodes, node_idx, Cp)
     % Upper Confidence bound: Q + Cp * sqrt(ln(Np) / Nc)
     parentN = nodes(node_idx).N;
@@ -444,10 +467,13 @@ function child_idx = uct_select_child_idx(nodes, node_idx, Cp)
     end
 end
 
-%---------------------------------------------------------------
-% Rollout policy and simulation
-%---------------------------------------------------------------
+% -------------------------------------------------------------------------
+% ROLLOUT POLICY AND SIMULATION
+% -------------------------------------------------------------------------
 
+%{
+TODO
+%}
 function move = policy_rollout_move(board, player)
     % Lightly biased rollout:
     %  1) take immediate win if available
@@ -501,6 +527,9 @@ function move = policy_rollout_move(board, player)
     move = moves(randi(numel(moves)));
 end
 
+%{
+TODO
+%}
 function result = rollout(board, player, root_player)
     % Random (biased) playout until terminal
     b = board;
@@ -528,6 +557,9 @@ function result = rollout(board, player, root_player)
     end
 end
 
+%{
+TODO
+%}
 function r = get_result(winner_flag, root_player)
     if winner_flag == 0
         r = 0.0;
@@ -538,9 +570,9 @@ function r = get_result(winner_flag, root_player)
     end
 end
 
-%---------------------------------------------------------------
-% Tree expansion & backprop
-%---------------------------------------------------------------
+% -------------------------------------------------------------------------
+% TREE EXPANSION & BACKPROP
+% -------------------------------------------------------------------------
 
 function [nodes, child_idx] = expand_node(nodes, node_idx)
     node = nodes(node_idx);
