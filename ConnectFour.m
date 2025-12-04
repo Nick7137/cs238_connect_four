@@ -569,63 +569,21 @@ end
 % -------------------------------------------------------------------------
 
 %{
-TODO
+Chooses a random move for the rollout policy.
 %}
 function move = policy_rollout_move(board, player)
-    % Lightly biased rollout:
-    %  1) take immediate win if available
-    %  2) block opponent's immediate win
-    %  3) prefer center/near-center
-    %  4) otherwise random legal
     moves = legal_moves(board);
     if isempty(moves)
         move = [];
         return;
     end
-    %{
-    % 1) win now
-    for k = 1:numel(moves)
-        m = moves(k);
-        b2 = make_move(board, m, player);
-        if winner(b2) == player
-            move = m;
-            return;
-        end
-    end
 
-    % 2) block opponent's immediate win
-    opp = -player;
-    for k = 1:numel(moves)
-        m = moves(k);
-        b2 = make_move(board, m, player);
-        opp_moves = legal_moves(b2);
-        for j = 1:numel(opp_moves)
-            o = opp_moves(j);
-            if winner(make_move(b2, o, opp)) == opp
-                if any(moves == o)
-                    move = o;
-                    return;
-                end
-            end
-        end
-    end
-
-    % 3) prefer center/near-center (columns 1..7)
-    % original pref in 0-based: [3,2,4,1,5,0,6] -> 1-based [4,3,5,2,6,1,7]
-    pref = [4 3 5 2 6 1 7];
-    for k = 1:numel(pref)
-        if any(moves == pref(k))
-            move = pref(k);
-            return;
-        end
-    end
-    %}
-    % 4) fallback random
+    % Pick a random legal move.
     move = moves(randi(numel(moves)));
 end
 
 %{
-TODO
+Implements the rollout phase of the MCTS
 %}
 function result = rollout(board, player, root_player)
     % Random (biased) playout until terminal
@@ -654,49 +612,77 @@ function result = rollout(board, player, root_player)
     end
 end
 
-%{
-TODO
-%}
-function r = get_result(winner_flag, root_player)
-    if winner_flag == 0
-        r = 0.0;
-    elseif winner_flag == root_player
-        r = 1.0;
-    else
-        r = -1.0;
-    end
-end
-
 % -------------------------------------------------------------------------
-% TREE EXPANSION & BACKPROP
+% TREE EXPANSION
 % -------------------------------------------------------------------------
 
 %{
-TODO
+When the MCTS selection phase reaches a node that is not fully expanded
+(i.e. it still has available untried moves), the function takes the current
+set of nodes and the index of the node to be expanded.
 %}
 function [nodes, child_idx] = expand_node(nodes, node_idx)
+    
+    % Retrieve the current node's data, select the last move from the list
+    % of untried legal moves and remove this move from the untried list of
+    % the parent node marking it as explored.
     node = nodes(node_idx);
     m = node.untried(end);
     node.untried(end) = [];
 
+    % Simulate the actual move by calling the make_move function, applying
+    % move m to parent's board (node.board) by the current player
+    % (node.player. This creates the board state for the new child node.
     child_board = make_move(node.board, m, node.player);
     child_idx   = numel(nodes) + 1;
 
+    % Initialise the new child node.
     nodes(child_idx) = create_node(child_board, -node.player, node_idx, m);
     node.children    = [node.children, child_idx];
 
     nodes(node_idx)  = node;
 end
 
+% -------------------------------------------------------------------------
+% BACKPROPAGATION
+% -------------------------------------------------------------------------
+
 %{
-TODO
+Convert the winner/loser flags into numerical rewards for backpropagation.
+%}
+function reward = get_result(winner_flag, root_player)
+    if winner_flag == 0
+        reward = 0.0;
+    elseif winner_flag == root_player
+        reward = 1.0;
+    else
+        reward = -1.0;
+    end
+end
+
+%{
+The function traverses the tree upwards, starting from the node that was
+just expanded or selected, going back to the root.
 %}
 function nodes = backpropagate(nodes, node_idx, reward)
     % Reward is from root player's perspective (no sign flip)
+    
+    % start point node
     n = node_idx;
+
+    % while not at the root node index.
     while n ~= 0
+
+        % This node was part of a completed MCTS cycle, so update the
+        % increment number of times visited.
         nodes(n).N = nodes(n).N + 1;
+        
+        % The reward from the simulation is added to the node's running
+        % total. The reward is from the root_player's perspective, so no
+        % sign flip is needed here.
         nodes(n).W = nodes(n).W + reward;
+
+        % move up the tree by updating the index to the parent.
         n = nodes(n).parent;
     end
 end
