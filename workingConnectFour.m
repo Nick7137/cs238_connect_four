@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------- 
-% MCTS VS HUMAN
+% RUN MCTS VS HUMAN
 % -------------------------------------------------------------------------
 
 clear_all;
@@ -9,8 +9,9 @@ play_human_vs_ai([], 50000, 'iteration')
 % time based mode example for MCTS move calculation.
 %play_human_vs_ai(1, [], 'time')
 
-%%
-%--------------------------------MCTS PLAY VS RANDOM--------------------------------
+%% ------------------------------------------------------------------------
+% RUN MCTS VS RANDOM
+% -------------------------------------------------------------------------
 
 clear_all;
 
@@ -27,30 +28,14 @@ plot(1:n, results_sum,'-','LineWidth',2)
 xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
 ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
 grid on
-labels = arrayfun(@(k) sprintf('$iterations: %d$', k), iters, ...
-                  'UniformOutput', false);
+labels = arrayfun(@(k) sprintf('$iterations: %d$', k), iters, 'UniformOutput', false);
 legend(labels{:},'Fontsize',16,'interpreter','latex','location','best');
 
+%% ------------------------------------------------------------------------
+% RUN MCTS VS MCTS
+% -------------------------------------------------------------------------
 
-%%
-%--------------------------------MCTS PLAY VS MCTS--------------------------------
-clc
-clear
-clf
-close all
-%{
-n = 100;
-
-results = mcts_vs_mcts(n, 10,10);
-results_sum = cumsum(results);
-sums = sum(results == 1);
-
-figure(1)
-plot(1:n,results_sum,'-k','LineWidth',2)
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
-grid on
-%}
+clear_all;
 
 n = 100;
 for i = 1:50
@@ -68,7 +53,10 @@ grid on
 means = mean(results_sum,1);
 plot(1:n,means,'-k','LineWidth',2)
 
-%%
+%% ------------------------------------------------------------------------
+% MCTS IMPLEMENTATION
+% -------------------------------------------------------------------------
+
 function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
 % mcts_vs_random  Play MCTS vs a purely random opponent.
 %
@@ -223,7 +211,6 @@ function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
     end
 end
 
-
 function play_human_vs_ai(thinkTime, iterations, mode)
 % play_human_vs_ai  Human vs MCTS AI Connect-4.
 %
@@ -312,17 +299,24 @@ function play_human_vs_ai(thinkTime, iterations, mode)
     end
 end
 
+%% ------------------------------------------------------------------------ 
+% GAME MECHANICS
+% -------------------------------------------------------------------------
 
-%---------------------------------------------------------------
-% Game basics
-%---------------------------------------------------------------
-
+%{
+Initialise 6x7 grid as array of zeros. 0 is empty, -1 is MCTS, +1 is 
+human/random.
+%}
 function board = new_board()
     ROWS = 6;
     COLS = 7;
     board = zeros(ROWS, COLS);   % 0 empty, +1 human, -1 AI
 end
 
+%{
+Provides a visual output of the board to the terminal using O for MCTS
+and X for the human/random.
+%}
 function print_board(board)
     [ROWS, COLS] = size(board);
 
@@ -353,15 +347,17 @@ function print_board(board)
     fprintf('\n');
 end
 
-
-
+%{
+Returns the columns (1..7) which are not full
+%}
 function moves = legal_moves(board)
-    % Returns columns (1..7) that are not full
     moves = find(board(1,:) == 0);
 end
 
+%{
+Drop piece in selected column "col" (1..7) for given "player"
+%}
 function nb = make_move(board, col, player)
-    % Drop a piece in column "col" (1..7) for "player"
     [ROWS, ~] = size(board);
     r = ROWS;
     while r >= 1 && board(r,col) ~= 0
@@ -371,8 +367,10 @@ function nb = make_move(board, col, player)
     nb(r,col) = player;
 end
 
+%{
+Returns 1 or -1 if someone won; 0 otherwise
+%}
 function w = winner(board)
-    % Returns 1 or -1 if someone won; 0 otherwise
     [ROWS, COLS] = size(board);
     dirs = [1 0; 0 1; 1 1; 1 -1];
 
@@ -403,6 +401,9 @@ function w = winner(board)
     w = 0;
 end
 
+%{
+Checks if entire board is full => draw
+%}
 function tf = is_full(board)
     tf = all(board(1,:) ~= 0);
 end
