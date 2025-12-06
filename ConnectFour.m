@@ -1,3 +1,5 @@
+% TODO save the plots
+
 % ------------------------------------------------------------------------- 
 % MCTS VS HUMAN
 % -------------------------------------------------------------------------
@@ -8,38 +10,41 @@ clf
 close all
 
 %{
-TODO
+Function orchestrates the connect four game between a human and the MCTS.
+It manages the game loop, switches turns, handles human input validation,
+calls the MCTS driver, and determines the end-game outcome.
+Inputs:
+  thinkTime  : time in seconds per MCTS move (used if mode = 'time')
+  iterations : number of MCTS iterations per move (used if mode = 'iteration')
+  mode       : 'time' or 'iteration'
 %}
 function mcts_vs_human(thinkTime, iterations, mode)
-% mcts_vs_human  Human vs MCTS AI Connect-4.
-%
-% Inputs:
-%   thinkTime  : time in seconds per MCTS move (used if mode = 'time')
-%   iterations : number of MCTS iterations per move (used if mode = 'iteration')
-%   mode       : 'time' or 'iteration'
 
+    % validate the inputs are correct
     if nargin < 3
         error('Usage: mcts_vs_human(thinkTime, iterations, ''time'' or ''iteration'')');
     end
-
     mode = lower(string(mode));
     if mode ~= "time" && mode ~= "iteration"
         error('mode must be ''time'' or ''iteration''.');
     end
 
+    % initialise the game
     board = new_board();
     HUMAN =  1;
     AI    = -1;
-    turn  = HUMAN;   % change to AI if you want AI to start
+    turn  = HUMAN;   % change to AI to make AI start
 
     fprintf('You are X, AI is O. Enter column (1-7). ''q'' to quit.\n');
     print_board(board);
 
+    % is game running while loop
     while true
         if winner(board) ~= 0 || is_full(board)
             break;
         end
 
+        % let the human input move
         if turn == HUMAN
             moves = legal_moves(board);  % columns 1..7
             while true
@@ -67,6 +72,7 @@ function mcts_vs_human(thinkTime, iterations, mode)
             print_board(board);
             turn = AI;
 
+        % let the MCTS algorithm move
         else
             fprintf('AI thinking with MCTS (%s mode)...\n', mode);
 
@@ -88,6 +94,7 @@ function mcts_vs_human(thinkTime, iterations, mode)
         end
     end
 
+    % output the result of the game.
     w = winner(board);
     if w == HUMAN
         fprintf('You win!\n');
@@ -113,25 +120,22 @@ clf
 close all
 
 %{
-TODO
+MCTS plays against a purely random opponent.
+results(g) = +1  -> MCTS wins game g
+results(g) = -1  -> Random wins game g
+results(g) =  0  -> Draw
+Inputs:
+  numGames   : number of games to play
+  thinkTime  : time in seconds per MCTS move (used if mode = 'time')
+  iterations : number of MCTS iterations per move (used if mode = 'iteration')
+  mode       : 'time' or 'iteration'
 %}
 function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
-% mcts_vs_random  Play MCTS vs a purely random opponent.
-%
-% results(g) = +1  -> MCTS wins game g
-% results(g) = -1  -> Random wins game g
-% results(g) =  0  -> Draw
-%
-% Inputs:
-%   numGames   : number of games to play
-%   thinkTime  : time in seconds per MCTS move (used if mode = 'time')
-%   iterations : number of MCTS iterations per move (used if mode = 'iteration')
-%   mode       : 'time' or 'iteration'
 
+    % validate the inputs of the function
     if nargin < 4
         error('Usage: mcts_vs_random(numGames, thinkTime, iterations, ''time'' or ''iteration'')');
     end
-
     mode = lower(string(mode));
     if mode ~= "time" && mode ~= "iteration"
         error('mode must be ''time'' or ''iteration''.');
@@ -143,28 +147,32 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
 
     results = zeros(numGames, 1);
 
-    for g = 1:numGames
-        fprintf('Current game: %d / %d\n', g, numGames);
-
+    for game = 1:numGames
+        fprintf('Current game: %d / %d\n', game, numGames);
+        
+        % Create a new board and choose RANDOM to start
         board = new_board();
-        % Choose who starts; here RANDOM starts
         turn = RANDOM;
 
+        
         while true
+
+            % end the game if the board is full or if there is a winner
             w = winner(board);
             if w ~= 0 || is_full(board)
                 break;
             end
 
+            % MCTS to move, using either time mode or iterations mode
             if turn == MCTS
-                % MCTS move, using either time or iterations
                 if mode == "time"
                     move = mcts_best_move(board, MCTS, [], thinkTime, 1.1, []);
                 else % "iteration"
                     move = mcts_best_move(board, MCTS, iterations, [], 1.1, []);
                 end
+
+            % Random to move 
             else
-                % Random move
                 moves = legal_moves(board);
                 if isempty(moves)
                     break;
@@ -172,35 +180,40 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
                 move = moves(randi(numel(moves)));
             end
 
+            % make the move and switch the player
             if isempty(move)
                 break;
             end
-
             board = make_move(board, move, turn);
             turn  = -turn;  % switch player
         end
 
         w = winner(board);
         if w == MCTS
-            results(g) = 1;
+            results(game) = 1;
         elseif w == RANDOM
-            results(g) = -1;
+            results(game) = -1;
         else
-            results(g) = 0;
+            results(game) = 0;
         end
     end
 end
 
-n = 1000;
+% Create an array of different amounts of iterations to test, this is to 
+% compare the effect of changing the number of iterations.
 iters = [5 15 25 100 1000];
+
+numGamesInTournament = 1000;
 for i = 1:length(iters)
-    results(i,:) = mcts_vs_random(n, [], iters(i), 'iteration');
+    results(i,:) = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
     results_sum(i,:) = cumsum(results(i,:));
     sums(i) = sum(results(i,:) == 1);
 end
 
+% display multiple lines, where each line represents the outcome of 1000 
+% games played using a specific number of MCTS iterations
 figure;
-plot(1:n, results_sum,'-','LineWidth',2)
+plot(1:numGamesInTournament, results_sum,'-','LineWidth',2)
 xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
 ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
 grid on
@@ -218,26 +231,25 @@ clf
 close all
 
 %{
-TODO
+Conducts an automated tournament between two different MCTS players. They
+differ by the number of iterations they use in their MCTS to see if there
+is an advantage.
+results(g) = +1  -> Player 1 (MCTS1) wins game g
+results(g) = -1  -> Player 2 (MCTS2) wins game g
+results(g) =  0  -> Draw
+Inputs:
+  numGames    : number of games to play
+  iterationsP1: number of MCTS iterations per move for Player 1
+  iterationsP2: number of MCTS iterations per move for Player 2
+Notes:
+  - Player 1 is encoded as -1
+  - Player 2 is encoded as +1
+  - We alternate who starts: odd games -> Player 1 starts,
+                              even games -> Player 2 starts.
 %}
 function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
-% mcts_vs_mcts  Play MCTS vs MCTS in Connect-4.
-%
-% results(g) = +1  -> Player 1 (MCTS1) wins game g
-% results(g) = -1  -> Player 2 (MCTS2) wins game g
-% results(g) =  0  -> Draw
-%
-% Inputs:
-%   numGames    : number of games to play
-%   iterationsP1: number of MCTS iterations per move for Player 1
-%   iterationsP2: number of MCTS iterations per move for Player 2
-%
-% Notes:
-%   - Player 1 is encoded as -1
-%   - Player 2 is encoded as +1
-%   - We alternate who starts: odd games -> Player 1 starts,
-%                               even games -> Player 2 starts.
 
+    % check if the inputs are valid
     if nargin < 2
         error('Usage: mcts_vs_mcts(numGames, iterationsP1, [iterationsP2])');
     end
@@ -246,73 +258,106 @@ function results = mcts_vs_mcts(numGames, iterationsP1, iterationsP2)
         iterationsP2 = iterationsP1;
     end
 
-    % Convention: P1 = -1, P2 = +1 (same style as your other code)
+    % Convention: P1 = -1, P2 = +1
     P1 = -1;
     P2 =  1;
 
     results = zeros(numGames, 1);
 
-    for g = 1:numGames
-        fprintf('Current game: %d / %d\n', g, numGames);
+    for game = 1:numGames
 
+        % create a new game
+        fprintf('Current game: %d / %d\n', game, numGames);
         board = new_board();
 
         % Alternate starting player for fairness
-        if mod(g, 2) == 1
+        if mod(game, 2) == 1
             turn = P1;
         else
             turn = P2;
         end
 
+        % play a game
         while true
             w = winner(board);
             if w ~= 0 || is_full(board)
                 break;
             end
 
-            % MCTS move for the current player, with its own iteration budget
+            % MCTS move for the current player, with its own iteration 
+            % budget
             if turn == P1
                 move = mcts_best_move(board, P1, iterationsP1, [], 1.1, []);
             else
                 move = mcts_best_move(board, P2, iterationsP2, [], 1.1, []);
             end
 
+            % If MCTS fails to return a move, abort this game as draw
             if isempty(move)
-                % If MCTS fails to return a move, abort this game as draw
                 break;
             end
 
+            % Make move and switch player
             board = make_move(board, move, turn);
-            turn  = -turn;  % switch player
+            turn  = -turn;  
         end
 
         % Determine outcome
         w = winner(board);
         if w == P1
-            results(g) = 1;
+            results(game) = 1;
         elseif w == P2
-            results(g) = -1;
+            results(game) = -1;
         else
-            results(g) = 0;
+            results(game) = 0;
         end
     end
 end
 
-n = 100;
-for i = 1:50
-    results(i,:) = mcts_vs_mcts(n,21,19);
+% execute a tournament-style performance test between two slightly
+% different MCTS agenst and then plot the results. Trying to see if a small
+% advantage in MCTS iteration budget translates to a significant win rate
+% difference over multiple trials.
+
+% num games to play in each tournament
+numGamesInTournament = 100;
+
+% number of times we are running the tournament
+numTournaments = 50;
+
+iterationsP1 = 21;
+iterationsP2 = 19;
+
+for i = 1:numTournaments
+    % run the tournament with all the games
+    results(i,:) = mcts_vs_mcts(numGamesInTournament, iterationsP1, iterationsP2);
+    
+    % get the cumulative sum of the net score P1wins - P2wins over the
+    % number of games for that tournament
     results_sum(i,:) = cumsum(results(i,:));
+
+    % counts the total number of games won by player 1 in the tournament
     sums(i) = nnz(results(i,:) == 1);
     
+    % plot the cumulative sum line for this tournament
     figure(1)
     hold on
-    plot(1:n,results_sum(i,:),'-','LineWidth',1)
+    plot(1:numGamesInTournament,results_sum(i,:),'-','LineWidth',1)
 end
+
 xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
 ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
 grid on
+
+% calculate the average cumulative score (i.e. player whose won the most
+% games) at each point in the tournament over the many tournaments. i.e.
+% the results of all the game1's are averaged together and all the game2's
+% are averaged together etc. We average it this way so we can find the
+% average performance trend over time.
+% This is done to reduce the noise from the randomness in the rollout
+% phase etc.
 means = mean(results_sum,1);
-plot(1:n,means,'-k','LineWidth',2)
+plot(1:numGamesInTournament,means,'-k','LineWidth',2)
 
 %% ------------------------------------------------------------------------ 
 % GAME MECHANICS
