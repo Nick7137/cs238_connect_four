@@ -321,10 +321,10 @@ end
 % difference over multiple trials.
 
 % num games to play in each tournament
-numGamesInTournament = 10;
+numGamesInTournament = 100;
 
 % number of times we are running the tournament
-numTournaments = 5;
+numTournaments = 50;
 
 iterationsP1 = 21;
 iterationsP2 = 19;
