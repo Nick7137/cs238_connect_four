@@ -149,11 +149,10 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
     for game = 1:numGames
         fprintf('Current game: %d / %d\n', game, numGames);
         
-        % Create a new board and choose RANDOM to start
+        % Create a new board and choose which player starts
         board = new_board();
-        turn = RANDOM;
+        turn = MCTS;
 
-        
         while true
 
             % end the game if the board is full or if there is a winner
@@ -208,6 +207,7 @@ for i = 1:length(iters)
     results(i,:) = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
     results_sum(i,:) = cumsum(results(i,:));
     sums(i) = sum(results(i,:) == 1);
+    win_rate(i) = sums(i)/numGamesInTournament * 100;
 end
 
 % display multiple lines, where each line represents the outcome of 1000 
@@ -220,7 +220,7 @@ grid on
 labels = arrayfun(@(k) sprintf('Iterations: %d', k), iters, ...
                   'UniformOutput', false);
 legend(labels{:},'Fontsize',12,'location','best');
-print('MCTS_vs_Random_Iterations_Performance','-dpng','-r300');
+print('mcts_vs_random_','-dpng','-r300');
 
 %% ------------------------------------------------------------------------
 % MCTS VS MCTS
@@ -364,7 +364,7 @@ grid on
 means = mean(results_sum,1);
 plot(1:numGamesInTournament,means,'-k','LineWidth',2)
 
-print('MCTS_vs_MCTS_Net_Score','-dpng','-r300');
+print('mcts_vs_mcts_','-dpng','-r300');
 
 %% ------------------------------------------------------------------------ 
 % GAME MECHANICS
