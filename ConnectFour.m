@@ -1,5 +1,3 @@
-% TODO save the plots
-
 % ------------------------------------------------------------------------- 
 % MCTS VS HUMAN
 % -------------------------------------------------------------------------
@@ -105,6 +103,7 @@ function mcts_vs_human(thinkTime, iterations, mode)
     end
 end
 
+% iteration based mode example for MCTS move calculation.
 mcts_vs_human([], 50000, 'iteration')
 
 % time based mode example for MCTS move calculation.
@@ -204,6 +203,7 @@ end
 iters = [5 15 25 100 1000];
 
 numGamesInTournament = 1000;
+
 for i = 1:length(iters)
     results(i,:) = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
     results_sum(i,:) = cumsum(results(i,:));
@@ -214,12 +214,13 @@ end
 % games played using a specific number of MCTS iterations
 figure;
 plot(1:numGamesInTournament, results_sum,'-','LineWidth',2)
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
+xlabel('Games Played','FontSize',12)
+ylabel('Cumulative Sum of Games Won','FontSize',12)
 grid on
-labels = arrayfun(@(k) sprintf('$iterations: %d$', k), iters, ...
+labels = arrayfun(@(k) sprintf('Iterations: %d', k), iters, ...
                   'UniformOutput', false);
-legend(labels{:},'Fontsize',16,'interpreter','latex','location','best');
+legend(labels{:},'Fontsize',12,'location','best');
+print('MCTS_vs_Random_Iterations_Performance','-dpng','-r300');
 
 %% ------------------------------------------------------------------------
 % MCTS VS MCTS
@@ -320,10 +321,10 @@ end
 % difference over multiple trials.
 
 % num games to play in each tournament
-numGamesInTournament = 100;
+numGamesInTournament = 10;
 
 % number of times we are running the tournament
-numTournaments = 50;
+numTournaments = 5;
 
 iterationsP1 = 21;
 iterationsP2 = 19;
@@ -347,10 +348,10 @@ for i = 1:numTournaments
     plot(1:numGamesInTournament,results_sum(i,:),'-','LineWidth',1)
 end
 
-xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-dynamicLabel = sprintf('$Net \\; Score \\; Differential \\; (\\mathrm{MCTS}_{%d} - \\mathrm{MCTS}_{%d})$', ...
+xlabel('Games Played','FontSize',12)
+dynamicLabel = sprintf('Net Score Differential $(\\mathrm{MCTS}_{%d} - \\mathrm{MCTS}_{%d})$', ...
                         iterationsP1, iterationsP2);
-ylabel(dynamicLabel,'FontSize',16,'Interpreter','latex')
+ylabel(dynamicLabel,'FontSize',12,'Interpreter','latex')
 grid on
 
 % calculate the average cumulative score (i.e. player whose won the most
@@ -362,6 +363,8 @@ grid on
 % phase etc.
 means = mean(results_sum,1);
 plot(1:numGamesInTournament,means,'-k','LineWidth',2)
+
+print('MCTS_vs_MCTS_Net_Score','-dpng','-r300');
 
 %% ------------------------------------------------------------------------ 
 % GAME MECHANICS
