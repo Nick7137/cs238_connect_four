@@ -180,9 +180,9 @@ function [results, moves_hist] = mcts_vs_random(numGames, thinkTime, iterations,
             end
             board = make_move(board, move, turn);
             turn  = -turn;  % switch player
-            num_moves = num_moves + 1; % Added: increment move counter
+            num_moves = num_moves + 1; % increment move counter
         end
-        moves_hist(game) = num_moves; % Added: store move count
+        moves_hist(game) = num_moves; % store move count
         w = winner(board);
         if w == MCTS
             results(game) = 1;
@@ -191,14 +191,17 @@ function [results, moves_hist] = mcts_vs_random(numGames, thinkTime, iterations,
         else
             results(game) = 0;
         end
+
+        print_board(board)
     end
 end
 
 % Create an array of different amounts of iterations to test, this is to 
 % compare the effect of changing the number of iterations.
-iters = [5 15]% 25 100 1000];
-numGamesInTournament = 1000;
-all_moves_hist = cell(1, length(iters)); % Added: store all move history
+iters = [5]% 100 1000];
+numGamesInTournament = 100;
+all_moves_hist = cell(1, length(iters)); % store all move history
+
 for i = 1:length(iters)
     [results(i,:), all_moves_hist{i}] = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
     results_sum(i,:) = cumsum(results(i,:));
@@ -218,20 +221,35 @@ labels = arrayfun(@(k) sprintf('Iterations: %d', k), iters, ...
 legend(labels{:},'Fontsize',12,'location','best');
 print('mcts_vs_random_','-dpng','-r300');
 
-% Histogram plotting
-
-% Use subplot to display all histograms in a single figure for comparison
+% plot the histograms of game length
 figure;
+hold on; % Hold the current axis to plot multiple histograms
+
+% Connect Four min moves to win is 7, max is 42. Define common bins.
+min_moves = 7;
+max_moves = 42;
+common_bins = min_moves:1:max_moves; 
+H = []; % To store histogram handles for the legend
+
 for i = 1:length(iters)
-    subplot(length(iters), 1, i);
-    histogram(all_moves_hist{i}, 'Normalization', 'probability');
-    title(sprintf('Game Length Distribution (Iterations: %d)', iters(i)), 'FontSize', 10);
-    xlabel('Number of Moves to Game End', 'FontSize', 9);
-    ylabel('Probability', 'FontSize', 9);
-    grid on;
+    % Plot the histogram with transparency for overlap visibility
+    h = histogram(all_moves_hist{i}, 'Normalization', 'probability', ...
+                  'BinEdges', common_bins, 'FaceAlpha', 0.6);
+    H = [H, h]; % Collect histogram handle
 end
-% Adjust figure layout to prevent titles from overlapping
-sgtitle('Distribution of Game Lengths vs MCTS Iterations', 'FontSize', 14);
+
+title('Overlapping Distribution of Game Lengths vs MCTS Iterations', 'FontSize', 14);
+xlabel('Number of Moves to Game End', 'FontSize', 12);
+ylabel('Probability', 'FontSize', 12);
+grid on;
+
+% Create labels for the legend
+labels = arrayfun(@(k) sprintf('Iterations: %d', k), iters, ...
+                  'UniformOutput', false);
+
+% Add legend using the collected handles and labels
+legend(H, labels{:}, 'Location', 'best', 'FontSize', 10);
+hold off;
 print('mcts_vs_random_histogram_','-dpng','-r300');
 
 %% ------------------------------------------------------------------------
