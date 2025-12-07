@@ -329,6 +329,8 @@ iterationsP1 = 21;
 iterationsP2 = 19;
 
 for i = 1:numTournaments
+    fprintf("NEW TOURNAMENT\n");
+
     % run the tournament with all the games
     results(i,:) = mcts_vs_mcts(numGamesInTournament, iterationsP1, iterationsP2);
     
@@ -346,7 +348,9 @@ for i = 1:numTournaments
 end
 
 xlabel('$Games \; Played$','FontSize',16,'Interpreter','latex')
-ylabel('$Cumulative \; Sum \; of \; Games \; Won$','FontSize',16,'Interpreter','latex')
+dynamicLabel = sprintf('$Net \\; Score \\; Differential \\; (\\mathrm{MCTS}_{%d} - \\mathrm{MCTS}_{%d})$', ...
+                        iterationsP1, iterationsP2);
+ylabel(dynamicLabel,'FontSize',16,'Interpreter','latex')
 grid on
 
 % calculate the average cumulative score (i.e. player whose won the most
