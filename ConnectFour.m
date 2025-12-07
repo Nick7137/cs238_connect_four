@@ -128,9 +128,11 @@ Inputs:
   thinkTime  : time in seconds per MCTS move (used if mode = 'time')
   iterations : number of MCTS iterations per move (used if mode = 'iteration')
   mode       : 'time' or 'iteration'
+Outputs:
+  results    : array of game outcomes (+1, -1, 0)
+  moves_hist : array of the number of moves in each game
 %}
-function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
-
+function [results, moves_hist] = mcts_vs_random(numGames, thinkTime, iterations, mode)
     % validate the inputs of the function
     if nargin < 4
         error('Usage: mcts_vs_random(numGames, thinkTime, iterations, ''time'' or ''iteration'')');
@@ -139,28 +141,24 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
     if mode ~= "time" && mode ~= "iteration"
         error('mode must be ''time'' or ''iteration''.');
     end
-
     % Convention: MCTS is -1, Random is +1
     MCTS   = -1;
     RANDOM =  1;
-
     results = zeros(numGames, 1);
-
+    moves_hist = zeros(numGames, 1); % store move counts
     for game = 1:numGames
         fprintf('Current game: %d / %d\n', game, numGames);
         
         % Create a new board and choose which player starts
         board = new_board();
         turn = MCTS;
-
+        num_moves = 0; % Added: initialize move counter
         while true
-
             % end the game if the board is full or if there is a winner
             w = winner(board);
             if w ~= 0 || is_full(board)
                 break;
             end
-
             % MCTS to move, using either time mode or iterations mode
             if turn == MCTS
                 if mode == "time"
@@ -168,7 +166,6 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
                 else % "iteration"
                     move = mcts_best_move(board, MCTS, iterations, [], 1.1, []);
                 end
-
             % Random to move 
             else
                 moves = legal_moves(board);
@@ -177,15 +174,15 @@ function results = mcts_vs_random(numGames, thinkTime, iterations, mode)
                 end
                 move = moves(randi(numel(moves)));
             end
-
             % make the move and switch the player
             if isempty(move)
                 break;
             end
             board = make_move(board, move, turn);
             turn  = -turn;  % switch player
+            num_moves = num_moves + 1; % Added: increment move counter
         end
-
+        moves_hist(game) = num_moves; % Added: store move count
         w = winner(board);
         if w == MCTS
             results(game) = 1;
@@ -199,12 +196,11 @@ end
 
 % Create an array of different amounts of iterations to test, this is to 
 % compare the effect of changing the number of iterations.
-iters = [5 15 25 100 1000];
-
+iters = [5 15]% 25 100 1000];
 numGamesInTournament = 1000;
-
+all_moves_hist = cell(1, length(iters)); % Added: store all move history
 for i = 1:length(iters)
-    results(i,:) = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
+    [results(i,:), all_moves_hist{i}] = mcts_vs_random(numGamesInTournament, [], iters(i), 'iteration');
     results_sum(i,:) = cumsum(results(i,:));
     sums(i) = sum(results(i,:) == 1);
     win_rate(i) = sums(i)/numGamesInTournament * 100;
@@ -221,6 +217,22 @@ labels = arrayfun(@(k) sprintf('Iterations: %d', k), iters, ...
                   'UniformOutput', false);
 legend(labels{:},'Fontsize',12,'location','best');
 print('mcts_vs_random_','-dpng','-r300');
+
+% Histogram plotting
+
+% Use subplot to display all histograms in a single figure for comparison
+figure;
+for i = 1:length(iters)
+    subplot(length(iters), 1, i);
+    histogram(all_moves_hist{i}, 'Normalization', 'probability');
+    title(sprintf('Game Length Distribution (Iterations: %d)', iters(i)), 'FontSize', 10);
+    xlabel('Number of Moves to Game End', 'FontSize', 9);
+    ylabel('Probability', 'FontSize', 9);
+    grid on;
+end
+% Adjust figure layout to prevent titles from overlapping
+sgtitle('Distribution of Game Lengths vs MCTS Iterations', 'FontSize', 14);
+print('mcts_vs_random_histogram_','-dpng','-r300');
 
 %% ------------------------------------------------------------------------
 % MCTS VS MCTS
