@@ -18,6 +18,9 @@ Inputs:
 %}
 function mcts_vs_human(thinkTime, iterations, mode)
 
+    % MCTS exploration constant
+    C_explore = 2;
+
     % validate the inputs are correct
     if nargin < 3
         error('Usage: mcts_vs_human(thinkTime, iterations, ''time'' or ''iteration'')');
@@ -31,7 +34,7 @@ function mcts_vs_human(thinkTime, iterations, mode)
     board = new_board();
     HUMAN =  1;
     AI    = -1;
-    turn  = HUMAN;   % change to AI to make AI start
+    turn  = AI;   % change to AI to make AI start
 
     fprintf('You are X, AI is O. Enter column (1-7). ''q'' to quit.\n');
     print_board(board);
@@ -76,9 +79,9 @@ function mcts_vs_human(thinkTime, iterations, mode)
 
             % MCTS move, using either time or iterations
             if mode == "time"
-                move = mcts_best_move(board, AI, [], thinkTime, 1.1, []);
+                move = mcts_best_move(board, AI, [], thinkTime, C_explore, []);
             else  % "iteration"
-                move = mcts_best_move(board, AI, iterations, [], 1.1, []);
+                move = mcts_best_move(board, AI, iterations, [], C_explore, []);
             end
 
             if isempty(move)
@@ -104,7 +107,7 @@ function mcts_vs_human(thinkTime, iterations, mode)
 end
 
 % iteration based mode example for MCTS move calculation.
-mcts_vs_human([], 50000, 'iteration')
+mcts_vs_human([], 100000, 'iteration')
 
 % time based mode example for MCTS move calculation.
 %mcts_vs_human(1, [], 'time')
@@ -737,4 +740,105 @@ function nodes = backpropagate(nodes, node_idx, reward)
         % move up the tree by updating the index to the parent.
         n = nodes(n).parent;
     end
+end
+
+
+% -------------------------------------------------------------------------
+% CHECK OPTIMALITY
+% -------------------------------------------------------------------------
+
+%{
+PERFECT_MOVES_FROM_SOLVER Returns solver-optimal moves for a Connect-4 board
+  board: 6x7 numeric, 0 empty, +1 player X, -1 player O   (same format as your code)
+  currentPlayer: +1 or -1 indicating whose turn it is (the "current player")
+
+  bestMoves: vector of 1-based column indices that are optimal for currentPlayer
+  scores:    1x7 array of solver scores for each legal move (NaN if not legal)
+
+Requirements:
+  - Python environment with package 'connect-four-ai' installed and available to MATLAB:
+      pip install connect-four-ai
+
+Notes:
+  - The solver's Position.from_board_string expects a 42-char string
+    reading rows top->bottom, left->right, with '.' empty, 'x' for current
+    player and 'o' for opponent. We map currentPlayer -> 'x'.
+%}
+function [bestMoves, scores] = perfect_moves_from_solver(board, currentPlayer)
+    
+    % --- Input checks
+    arguments
+        board (6,7) double
+        currentPlayer (1,1) double {mustBeMember(currentPlayer, [-1,1])}
+    end
+    
+    % --- 1) Build board string top->bottom, left->right
+    % MATLAB board: row 1 is top, row 6 bottom in your code's printing convention.
+    boardStrChars = repmat('.', 1, 42);
+    idx = 1;
+    for r = 1:6
+        for c = 1:7
+            val = board(r,c);
+            if val == 0
+                ch = '.';
+            else
+                % solver wants 'x' for the current player, 'o' for opponent
+                if val == currentPlayer
+                    ch = 'x';
+                else
+                    ch = 'o';
+                end
+            end
+            boardStrChars(idx) = ch;
+            idx = idx + 1;
+        end
+    end
+    boardStr = char(boardStrChars);
+    
+    % --- 2) import Python module
+    try
+        cf = py.importlib.import_module('connect_four_ai');
+    catch ME
+        error(['Could not import Python module connect_four_ai. ' ...
+               'Make sure you installed it into the same Python environment that MATLAB uses. ' ...
+               'Example: pip install connect-four-ai. MATLAB must be configured to use that Python. ' ...
+               'Original error: ' ME.message]);
+    end
+    
+    % --- 3) Construct Position and Solver
+    % Use Position.from_board_string(boardStr)
+    posResult = cf.Position.from_board_string(boardStr);
+    % posResult is a Python object (Position). If it raised an error, MATLAB would have thrown earlier.
+    pos = posResult;  
+    
+    solver = cf.Solver();   % instantiate the strong solver
+    
+    % --- 4) For each legal column, simulate playing that column and ask solver for score
+    scores = nan(1,7);
+    legalCols = find(board(1,:) == 0);  % same as your legal_moves
+    for col = legalCols
+        % Python Position.play expects 0-based column index
+        pcopy = pos.clone();            % clone so we don't mutate original
+        pcopy.play(int64(col-1));       % play is zero-indexed
+        % solver.solve returns an int score (positive -> current player (who moved?) wins)
+        sc = solver.solve(pcopy);
+        % Convert Python integer to MATLAB double
+        scores(col) = double(sc);
+    end
+    
+    % --- 5) Interpretation:
+    % The solver returns a signed score where higher is better for the player to move in THAT POSITION.
+    % We evaluated the position *after* the candidate move was played. From that result:
+    % - If the score is positive, the player who would move in that child position (i.e., the opponent) is winning.
+    % - To pick the best move for the current player, we want the candidate that gives the *most negative* score
+    %   from the opponent's perspective (i.e. the best outcome for currentPlayer), OR equivalently the
+    %   candidate with the highest value when we flip sign.
+    %
+    % Simpler: pick moves whose resulting score is minimal for the side that will move next.
+    % But a more robust way is: compute "value_for_current = -scores(child)" because we solved after currentPlayer played.
+    value_for_current = -scores;   % NaN for illegal places
+    
+    % Best value (higher is better for current player)
+    bestValue = max(value_for_current(~isnan(value_for_current)));
+    bestMoves = find(value_for_current == bestValue);
 end
